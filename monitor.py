@@ -65,10 +65,12 @@ def get_token_data(input_address, chain_id=None):
 async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     input_text = update.message.text.strip().split()
     
-    # 逻辑：如果只发地址，全网搜；如果发 "bsc 地址"，指定搜
+    # 支持两种格式：
+    # 1. 直接发地址：6vrUSDsW...
+    # 2. 链+地址：solana 6vrUSDsW...
     if len(input_text) == 1:
         addr = input_text[0]
-        chain = None
+        chain = "solana" # 如果你大部分查的是索拉纳，可以默认设为 solana
     elif len(input_text) == 2:
         chain = input_text[0].lower()
         addr = input_text[1]
@@ -77,16 +79,36 @@ async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if len(addr) < 30: return
     
-    msg_status = await update.message.reply_text(f"⚡ 正在检索 {'全局' if not chain else chain} 数据...")
+    msg_status = await update.message.reply_text(f"🔍 正在精准穿透检索 {chain} 链数据...")
     
-    # 调用我们之前的函数
-    pair = get_token_data(addr, chain)
+    # 核心变动：直接拼凑 Pairs 接口 URL，跳过 Tokens 接口
+    url = f"https://api.dexscreener.com/latest/dex/pairs/{chain}/{addr}"
     
-    if pair:
-        await msg_status.edit_text(format_msg(pair, "手动查询"), parse_mode='HTML', disable_web_page_preview=True)
-    else:
-        await msg_status.edit_text(f"❌ 未找到池子。\n提示：如果是新币，请尝试发送：\n<code>bsc {addr}</code>")
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        res = requests.get(url, headers=headers, timeout=10).json()
+        pair = None
+        
+        # 如果直接查到了（说明你发的是池子地址）
+        if res.get('pairs'):
+            pair = res['pairs'][0]
+        else:
+            # 如果查不到，再降级去搜一次 Tokens 接口（说明你发的是代币地址）
+            token_url = f"https://api.dexscreener.com/latest/dex/tokens/{addr}"
+            res_token = requests.get(token_url, headers=headers, timeout=10).json()
+            if res_token.get('pairs'):
+                # 过滤出对应链并取流动性最高的
+                v_pairs = [p for p in res_token['pairs'] if p.get('chainId') == chain]
+                if v_pairs:
+                    pair = max(v_pairs, key=lambda x: float(x.get('liquidity', {}).get('usd', 0)))
 
+        if pair:
+            await msg_status.edit_text(format_msg(pair, "精准查询"), parse_mode='HTML', disable_web_page_preview=True)
+        else:
+            await msg_status.edit_text("❌ 检索失败。请检查地址是否正确，或者尝试加上链名发送（如：solana 地址）。")
+            
+    except Exception as e:
+        await msg_status.edit_text(f"⚠️ 系统错误: {str(e)}")
 # ================== 定时模式 (自动化任务) ==================
 
 def run_cron_job():
