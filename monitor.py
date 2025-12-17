@@ -121,7 +121,7 @@ if __name__ == "__main__":
     import sys
     
     # 💡 将 http 修改为 socks5h (h 代表让代理处理域名解析，更稳定)
-    CLASH_PROXY = "socks5h://127.0.0.1:56423" 
+    CLASH_PROXY = "socks5h://127.0.0.1:7890" 
 
     if len(sys.argv) > 1 and sys.argv[1] == "--cron":
         run_cron_job()
