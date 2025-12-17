@@ -9,7 +9,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # ================== 核心配置区域 ==================
 # 这里填入你想每天收日报的币种。格式：'显示名字': ('链ID', '代币合约')
 POOLS = {
-    'LAF': ('bsc', '0x541b525b69210bc349c7d94ea6f10e202a6f90fa'),
+    'LAF': ('bsc', '0x3bec20ca77e100c50ef0d0066f4c2b348e615f48'),
     'RAIL': ('ethereum', '0xe76c6c83af64e4c60245d8c7de953df673a7a33d'),
     'SOSD': ('solana', '9BJWrL5cP3AXSq42d2QxB71ywmadyTgYJFJoWFbaDp6Z'),
 }
