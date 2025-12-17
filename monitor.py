@@ -22,38 +22,42 @@ ALERT_THRESHOLD = 5.0  # 波动达到 5% 时才触发特别提醒
 # ================== 核心数据逻辑 ==================
 
 def get_token_data(input_address, chain_id=None):
-    """
-    双重检索逻辑：
-    1. 先尝试当做【代币地址】检索 (tokens 接口)
-    2. 如果失败，尝试当做【池子地址】检索 (pairs 接口)
-    """
     headers = {'User-Agent': 'Mozilla/5.0'}
+    input_address = input_address.strip()
     
-    # --- 第一步：尝试作为“代币合约”查询 ---
-    token_url = f"https://api.dexscreener.com/latest/dex/tokens/{input_address}"
-    try:
-        res = requests.get(token_url, timeout=15).json()
-        pairs = res.get('pairs')
-        if pairs:
-            # 如果指定了链则过滤，否则取全球流动性最大池
-            valid_pairs = [p for p in pairs if p.get('chainId') == chain_id.lower()] if chain_id else pairs
-            if valid_pairs:
-                return max(valid_pairs, key=lambda x: float(x.get('liquidity', {}).get('usd', 0)))
-    except:
-        pass
-
-    # --- 第二步：如果上面没搜到，尝试作为“池子地址”查询 ---
-    # 这步是关键！很多搜不到的情况是因为地址其实是 Pair 地址
-    # 如果手动指定了链，构造特定的 pairs 接口 URL
+    # 路径 A：如果你手动指定了链（例如发送：bsc 0x...）
     if chain_id:
+        # 尝试 Pairs 接口（最精准）
         pair_url = f"https://api.dexscreener.com/latest/dex/pairs/{chain_id}/{input_address}"
         try:
-            res = requests.get(pair_url, timeout=15).json()
-            if res.get('pairs'):
-                return res['pairs'][0]
-        except:
-            pass
-            
+            res = requests.get(pair_url, timeout=10).json()
+            if res.get('pairs'): return res['pairs'][0]
+        except: pass
+
+    # 路径 B：尝试 Token 接口（全网搜索）
+    token_url = f"https://api.dexscreener.com/latest/dex/tokens/{input_address}"
+    try:
+        res = requests.get(token_url, timeout=10).json()
+        pairs = res.get('pairs')
+        if pairs:
+            # 如果指定了链则过滤，否则取流动性最大的
+            valid = [p for p in pairs if p.get('chainId') == chain_id.lower()] if chain_id else pairs
+            if valid:
+                return max(valid, key=lambda x: float(x.get('liquidity', {}).get('usd', 0)))
+    except: pass
+
+    # 路径 C：万能搜索（不指定链搜索 Pair 接口）
+    # 有些地址其实是池子地址，通过这个接口能强制搜出来
+    search_url = f"https://api.dexscreener.com/latest/dex/search/?q={input_address}"
+    try:
+        res = requests.get(search_url, timeout=10).json()
+        pairs = res.get('pairs')
+        if pairs:
+            valid = [p for p in pairs if p.get('chainId') == chain_id.lower()] if chain_id else pairs
+            if valid:
+                return max(valid, key=lambda x: float(x.get('liquidity', {}).get('usd', 0)))
+    except: pass
+
     return None
 
 # ================== 交互模式 (手动查询) ==================
