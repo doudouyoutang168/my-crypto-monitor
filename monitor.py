@@ -21,35 +21,40 @@ ALERT_THRESHOLD = 5.0  # 波动达到 5% 时才触发特别提醒
 
 # ================== 核心数据逻辑 ==================
 
-def get_token_data(token_address, chain_id=None):
-    url = f"https://api.dexscreener.com/latest/dex/tokens/{token_address}"
+def get_token_data(input_address, chain_id=None):
+    """
+    双重检索逻辑：
+    1. 先尝试当做【代币地址】检索 (tokens 接口)
+    2. 如果失败，尝试当做【池子地址】检索 (pairs 接口)
+    """
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    
+    # --- 第一步：尝试作为“代币合约”查询 ---
+    token_url = f"https://api.dexscreener.com/latest/dex/tokens/{input_address}"
     try:
-        res = requests.get(url, timeout=15).json()
+        res = requests.get(token_url, timeout=15).json()
         pairs = res.get('pairs')
-        if not pairs: return None
-        # 如果指定了链则过滤，否则自动找全球流动性最大的池子
-        valid_pairs = [p for p in pairs if p.get('chainId') == chain_id.lower()] if chain_id else pairs
-        if not valid_pairs: return None
-        return max(valid_pairs, key=lambda x: float(x.get('liquidity', {}).get('usd', 0)))
-    except: return None
+        if pairs:
+            # 如果指定了链则过滤，否则取全球流动性最大池
+            valid_pairs = [p for p in pairs if p.get('chainId') == chain_id.lower()] if chain_id else pairs
+            if valid_pairs:
+                return max(valid_pairs, key=lambda x: float(x.get('liquidity', {}).get('usd', 0)))
+    except:
+        pass
 
-def format_msg(pair, title_prefix="查询结果", is_alert=False):
-    price = float(pair.get('priceUsd', 0))
-    mcap = pair.get('marketCap') or pair.get('fdv', 0)
-    change = pair.get('priceChange', {}).get('h24', 0)
-    liquidity = float(pair.get('liquidity', {}).get('usd', 0)) / 2
-    lp_link = f"https://dexscreener.com/{pair.get('chainId')}/{pair.get('pairAddress')}"
-    emoji = "🔔" if not is_alert else "🚨"
-    return (
-        f"{emoji} <b>{title_prefix} | {pair.get('baseToken', {}).get('symbol')}</b>\n"
-        f"网络: {pair.get('chainId').upper()} ({pair.get('dexId').upper()})\n\n"
-        f"💰 价格: <code>${price:.10f}</code>\n"
-        f"📊 市值: <code>${mcap:,.0f}</code>\n"
-        f"📈 24H: <b>{'+' if change>=0 else ''}{change}%</b>\n"
-        f"💧 底池: <code>${liquidity:,.0f}</code> (单边)\n"
-        f"------------------------------------\n"
-        f"🔗 <a href='{lp_link}'>点击实时看盘</a>"
-    )
+    # --- 第二步：如果上面没搜到，尝试作为“池子地址”查询 ---
+    # 这步是关键！很多搜不到的情况是因为地址其实是 Pair 地址
+    # 如果手动指定了链，构造特定的 pairs 接口 URL
+    if chain_id:
+        pair_url = f"https://api.dexscreener.com/latest/dex/pairs/{chain_id}/{input_address}"
+        try:
+            res = requests.get(pair_url, timeout=15).json()
+            if res.get('pairs'):
+                return res['pairs'][0]
+        except:
+            pass
+            
+    return None
 
 # ================== 交互模式 (手动查询) ==================
 
