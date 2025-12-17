@@ -44,19 +44,30 @@ def format_msg(pair, title_prefix="数据报告", is_alert=False):
         return f"⚠️ 格式化消息失败: {e}"
 
 def get_token_data(input_address, chain_id=None):
+    # 💡 这里的端口必须和你最下面设置的 Clash 端口一致
+    local_proxy = "http://127.0.0.1:52780" 
+    proxies = {
+        "http": local_proxy,
+        "https": local_proxy
+    }
+    
     headers = {'User-Agent': 'Mozilla/5.0'}
     input_address = input_address.strip()
     
+    # 1. 尝试使用 Pairs 接口 (如果指定了链)
     if chain_id:
         pair_url = f"https://api.dexscreener.com/latest/dex/pairs/{chain_id}/{input_address}"
         try:
-            res = requests.get(pair_url, timeout=10).json()
+            # 💡 增加 proxies=proxies
+            res = requests.get(pair_url, headers=headers, proxies=proxies, timeout=10).json()
             if res.get('pairs'): return res['pairs'][0]
         except: pass
 
+    # 2. 尝试使用 Tokens 接口 (全网搜索)
     token_url = f"https://api.dexscreener.com/latest/dex/tokens/{input_address}"
     try:
-        res = requests.get(token_url, timeout=10).json()
+        # 💡 增加 proxies=proxies
+        res = requests.get(token_url, headers=headers, proxies=proxies, timeout=10).json()
         pairs = res.get('pairs')
         if pairs:
             valid = [p for p in pairs if p.get('chainId') == (chain_id.lower() if chain_id else p.get('chainId'))]
