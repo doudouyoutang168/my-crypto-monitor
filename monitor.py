@@ -120,24 +120,30 @@ def run_cron_job():
 if __name__ == "__main__":
     import sys
     
-    # 💡 将 http 修改为 socks5h (h 代表让代理处理域名解析，更稳定)
-    CLASH_PROXY = "socks5h://127.0.0.1:7890" 
+    # 💡 这里的端口请根据你 Clash 界面上显示的 "Socks Port" 修改
+    # 默认通常是 7890，如果你的 Clash 显示是别的数字（如 1080），请修改它
+    LOCAL_SOCKS_PROXY = "socks5h://127.0.0.1:7890" 
 
     if len(sys.argv) > 1 and sys.argv[1] == "--cron":
+        # 云端运行模式
         run_cron_job()
     else:
         if not TOKEN:
-            print("❌ 错误: 未设置环境变量")
+            print("❌ 错误: 未设置 TG_BOT_TOKEN 环境变量")
         else:
-            print(f"🤖 机器人启动中... (切换至 SOCKS5 代理: {CLASH_PROXY})")
-            
-            # 适配 V20+ 版本的 API
-            app = Application.builder() \
-                .token(TOKEN) \
-                .proxy(CLASH_PROXY) \
-                .get_updates_proxy(CLASH_PROXY) \
-                .build()
-            
-            app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_query))
-            print("🚀 机器人已连接！请在 Telegram 发合约查询")
-            app.run_polling()
+            print(f"🤖 机器人尝试连接代理: {LOCAL_SOCKS_PROXY}")
+            try:
+                # 强制使用 SOCKS5 代理
+                app = Application.builder() \
+                    .token(TOKEN) \
+                    .proxy(LOCAL_SOCKS_PROXY) \
+                    .get_updates_proxy(LOCAL_SOCKS_PROXY) \
+                    .connect_timeout(30) \
+                    .read_timeout(30) \
+                    .build()
+                
+                app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_query))
+                print("🚀 机器人已连接！请在 Telegram 中发合约地址查询。")
+                app.run_polling()
+            except Exception as e:
+                print(f"💥 启动失败，请确认 Clash 是否开启以及端口是否正确: {e}")
