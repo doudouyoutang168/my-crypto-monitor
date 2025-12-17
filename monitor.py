@@ -119,8 +119,9 @@ def run_cron_job():
 
 if __name__ == "__main__":
     import sys
-    # 💡 端口请根据你的 Clash 设置进行微调
-    CLASH_PROXY = "http://127.0.0.1:56423" 
+    
+    # 💡 将 http 修改为 socks5h (h 代表让代理处理域名解析，更稳定)
+    CLASH_PROXY = "socks5h://127.0.0.1:56423" 
 
     if len(sys.argv) > 1 and sys.argv[1] == "--cron":
         run_cron_job()
@@ -128,9 +129,9 @@ if __name__ == "__main__":
         if not TOKEN:
             print("❌ 错误: 未设置环境变量")
         else:
-            print(f"🤖 机器人启动中... (使用代理: {CLASH_PROXY})")
+            print(f"🤖 机器人启动中... (切换至 SOCKS5 代理: {CLASH_PROXY})")
             
-            # ✅ 适配 V20+ 版本的 API
+            # 适配 V20+ 版本的 API
             app = Application.builder() \
                 .token(TOKEN) \
                 .proxy(CLASH_PROXY) \
