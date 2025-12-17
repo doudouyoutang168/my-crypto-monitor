@@ -20,7 +20,7 @@ HISTORY_FILE = 'history.json'
 ALERT_THRESHOLD = 5.0  
 
 # Clash 默认代理配置
-CLASH_PROXY = "http://127.0.0.1:7890"
+CLASH_PROXY = "http://127.0.0.1:56423"
 
 # ================== 核心数据逻辑 ==================
 
