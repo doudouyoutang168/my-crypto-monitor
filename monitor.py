@@ -13,14 +13,10 @@ POOLS = {
     'SOSD': ('solana', '9BJWrL5cP3AXSq42d2QxB71ywmadyTgYJFJoWFbaDp6Z'),
 }
 
-# 💡 如果环境变量不生效，你可以把下面引号里填入你的 Token 和 ID
 TOKEN = os.environ.get("TG_BOT_TOKEN")
 CHAT_ID = os.environ.get("TG_CHAT_ID")
 HISTORY_FILE = 'history.json'
 ALERT_THRESHOLD = 5.0  
-
-# Clash 默认代理配置
-CLASH_PROXY = "http://127.0.0.1:56423"
 
 # ================== 核心数据逻辑 ==================
 
@@ -51,7 +47,6 @@ def get_token_data(input_address, chain_id=None):
     headers = {'User-Agent': 'Mozilla/5.0'}
     input_address = input_address.strip()
     
-    # 路径 A：指定链查询
     if chain_id:
         pair_url = f"https://api.dexscreener.com/latest/dex/pairs/{chain_id}/{input_address}"
         try:
@@ -59,7 +54,6 @@ def get_token_data(input_address, chain_id=None):
             if res.get('pairs'): return res['pairs'][0]
         except: pass
 
-    # 路径 B：全网代币地址查询
     token_url = f"https://api.dexscreener.com/latest/dex/tokens/{input_address}"
     try:
         res = requests.get(token_url, timeout=10).json()
@@ -72,11 +66,8 @@ def get_token_data(input_address, chain_id=None):
 
     return None
 
-# ================== 交互模式 (手动查询) ==================
-
 async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text: return
-    
     input_text = update.message.text.strip().split()
     print(f"📩 收到消息: {update.message.text}") 
 
@@ -96,15 +87,10 @@ async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if pair:
         await msg_status.edit_text(format_msg(pair, "手动查询"), parse_mode='HTML', disable_web_page_preview=True)
     else:
-        await msg_status.edit_text("❌ 检索失败。请发送: <code>链名 地址</code>")
-
-# ================== 定时模式 (自动化任务) ==================
+        await msg_status.edit_text("❌ 检索失败。请检查地址。")
 
 def run_cron_job():
-    if not TOKEN or not CHAT_ID: 
-        print("❌ 错误: 缺少配置")
-        return
-    
+    if not TOKEN or not CHAT_ID: return
     history = {}
     if os.path.exists(HISTORY_FILE):
         try:
@@ -115,7 +101,6 @@ def run_cron_job():
     for name, (chain, addr) in POOLS.items():
         pair = get_token_data(addr, chain)
         if not pair: continue
-        
         curr_price = float(pair.get('priceUsd', 0))
         last_record = history.get(name, {})
         last_alert_price = last_record.get('last_alert_price', curr_price)
@@ -125,37 +110,33 @@ def run_cron_job():
             if abs(diff_pct) >= ALERT_THRESHOLD:
                 requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
                              data={"chat_id": CHAT_ID, "text": format_msg(pair, f"波动提醒({diff_pct:.1f}%)", True), "parse_mode": "HTML"})
-            
             requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
                          data={"chat_id": CHAT_ID, "text": format_msg(pair, "定时监控"), "parse_mode": "HTML"})
-        except Exception as e:
-            print(f"⚠️ 推送失败: {e}")
+        except: pass
         
         new_history[name] = {"last_alert_price": last_alert_price, "last_price": curr_price}
-        time.sleep(1)
-        
     with open(HISTORY_FILE, 'w') as f: json.dump(new_history, f)
 
 if __name__ == "__main__":
     import sys
-    
+    # 💡 端口请根据你的 Clash 设置进行微调
+    CLASH_PROXY = "http://127.0.0.1:56423" 
+
     if len(sys.argv) > 1 and sys.argv[1] == "--cron":
-        # 云端定时任务模式：不使用代理
         run_cron_job()
     else:
-        # 本地交互模式：自动启用 Clash 代理
         if not TOKEN:
             print("❌ 错误: 未设置环境变量")
         else:
-            print(f"🤖 机器人启动中... (Clash 代理: {CLASH_PROXY})")
+            print(f"🤖 机器人启动中... (使用代理: {CLASH_PROXY})")
             
-            # 配置代理
+            # ✅ 适配 V20+ 版本的 API
             app = Application.builder() \
                 .token(TOKEN) \
-                .proxy_url(CLASH_PROXY) \
-                .get_updates_proxy_url(CLASH_PROXY) \
+                .proxy(CLASH_PROXY) \
+                .get_updates_proxy(CLASH_PROXY) \
                 .build()
             
             app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_query))
-            print("🚀 机器人已连接！请在 Telegram 中发合约地址给我。")
+            print("🚀 机器人已连接！请在 Telegram 发合约查询")
             app.run_polling()
