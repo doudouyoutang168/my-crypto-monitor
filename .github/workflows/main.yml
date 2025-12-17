@@ -1,0 +1,28 @@
+name: Daily Crypto Monitor
+
+on:
+  schedule:
+    # 这里的 cron 是 UTC 时间，00:00 代表北京时间早上 8:00
+    - cron: '0 0 * * *'
+  workflow_dispatch: # 允许你手动点击运行测试
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install requests python-telegram-bot
+
+      - name: Run Monitor
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: python monitor.py --cron  # 注意这里的 --cron 参数
