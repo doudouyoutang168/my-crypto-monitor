@@ -54,14 +54,29 @@ def format_msg(pair, title_prefix="查询结果", is_alert=False):
 # ================== 交互模式 (手动查询) ==================
 
 async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    addr = update.message.text.strip()
+    input_text = update.message.text.strip().split()
+    
+    # 逻辑：如果只发地址，全网搜；如果发 "bsc 地址"，指定搜
+    if len(input_text) == 1:
+        addr = input_text[0]
+        chain = None
+    elif len(input_text) == 2:
+        chain = input_text[0].lower()
+        addr = input_text[1]
+    else:
+        return
+
     if len(addr) < 30: return
-    msg_status = await update.message.reply_text("⚡ 正在从链上检索数据...")
-    pair = get_token_data(addr)
+    
+    msg_status = await update.message.reply_text(f"⚡ 正在检索 {'全局' if not chain else chain} 数据...")
+    
+    # 调用我们之前的函数
+    pair = get_token_data(addr, chain)
+    
     if pair:
         await msg_status.edit_text(format_msg(pair, "手动查询"), parse_mode='HTML', disable_web_page_preview=True)
     else:
-        await msg_status.edit_text("❌ 未找到有效池子。")
+        await msg_status.edit_text(f"❌ 未找到池子。\n提示：如果是新币，请尝试发送：\n<code>bsc {addr}</code>")
 
 # ================== 定时模式 (自动化任务) ==================
 
