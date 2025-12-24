@@ -45,7 +45,7 @@ def format_msg(pair, title_prefix="数据报告", is_alert=False):
 
 def get_token_data(input_address, chain_id=None):
     # 保持你的 52780 端口不变
-    local_proxy = "http://127.0.0.1:52780" 
+    local_proxy = "http://127.0.0.1:566820" 
     proxies = {"http": local_proxy, "https": local_proxy}
     headers = {'User-Agent': 'Mozilla/5.0'}
     input_address = input_address.strip()
@@ -135,7 +135,7 @@ if __name__ == "__main__":
     
     # 💡 这里的端口请根据你 Clash 界面上显示的 "Socks Port" 修改
     # 默认通常是 7890，如果你的 Clash 显示是别的数字（如 1080），请修改它
-    LOCAL_SOCKS_PROXY = "socks5h://127.0.0.1:52780" 
+    LOCAL_SOCKS_PROXY = "socks5h://127.0.0.1:56682" 
 
     if len(sys.argv) > 1 and sys.argv[1] == "--cron":
         # 云端运行模式
